@@ -9,6 +9,12 @@ description = "Alloy transport and signer for browser wallets (window.ethereum)"
 repository = "https://github.com/yourusername/alloy-transport-window"
 keywords = ["ethereum", "web3", "alloy", "metamask", "wasm"]
 categories = ["wasm", "web-programming", "cryptography::cryptocurrencies"]
+exclude = [
+    "example/",
+    ".git/",
+    ".gitignore",
+    "target/",
+]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
