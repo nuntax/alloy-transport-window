@@ -1,0 +1,59 @@
+[package]
+name = "alloy-transport-window"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+authors = ["nun"]
+license = "MIT OR Apache-2.0"
+description = "Alloy transport and signer for browser wallets (window.ethereum)"
+repository = "https://github.com/yourusername/alloy-transport-window"
+keywords = ["ethereum", "web3", "alloy", "metamask", "wasm"]
+categories = ["wasm", "web-programming", "cryptography::cryptocurrencies"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[package.metadata.docs.rs]
+default-target = "wasm32-unknown-unknown"
+targets = ["wasm32-unknown-unknown"]
+
+[dependencies]
+# Alloy core
+alloy-provider = { version = "1.4", default-features = false }
+alloy-transport = { version = "1.4", default-features = false, features = ["wasm-bindgen"] }
+alloy-json-rpc = { version = "1.4", default-features = false }
+alloy-signer = { version = "1.4", default-features = false }
+alloy-primitives = { version = "1.4", default-features = false }
+alloy-network = { version = "1.4", default-features = false }
+alloy-consensus = { version = "1.4", default-features = false }
+alloy-rpc-client = { version = "1.4", default-features = false }
+alloy-rpc-types-eth = { version = "1.4", default-features = false }
+
+# WASM bindings
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+serde-wasm-bindgen = "0.6"
+
+# Async/Tower
+async-trait = "0.1"
+futures = "0.3"
+tower = { version = "0.5", features = ["util"] }
+
+# Error handling
+thiserror = "2.0"
+
+# Utilities
+hex = "0.4"
+getrandom = { version = "0.2", features = ["js"] }
+tracing = "0.1"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[features]
+default = []
