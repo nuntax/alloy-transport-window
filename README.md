@@ -4,14 +4,6 @@ Alloy transport and signer implementations for browser-based Ethereum wallets vi
 
 This crate provides a bridge between [Alloy](https://github.com/alloy-rs/alloy) and browser wallet extensions like MetaMask, Rabby, and Coinbase Wallet that implement the EIP-1193 standard.
 
-## Features
-
-- **WindowTransport**: Routes Alloy RPC calls through `window.ethereum`
-- **WindowSigner**: Delegates message signing to the browser wallet
-- **Transaction Support**: Send transactions via `eth_sendTransaction` with wallet-side signing
-- **WASM-first**: Built specifically for browser environments
-- **Lightweight**: ~300 lines of well-documented code
-
 ## Installation
 
 Add this to your `Cargo.toml`:
