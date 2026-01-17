@@ -165,6 +165,9 @@ impl Signer for WindowSigner {
     }
 }
 
+// SAFETY: WASM is single-threaded, so Send and Sync are safe to implement
+// even though JsValue is not Send/Sync. These traits are only used for
+// multi-threaded environments, which don't exist in WASM.
 #[cfg(target_arch = "wasm32")]
 unsafe impl Send for WindowSigner {}
 
