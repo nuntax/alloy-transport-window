@@ -143,7 +143,12 @@ impl WindowSigner {
         &self,
         typed_data: &TypedData,
     ) -> SignerResult<Signature> {
-        let typed_data_value = serde_wasm_bindgen::to_value(typed_data).map_err(|e| {
+        // Use json_compatible() so BTreeMaps (e.g. the `types` field) are
+        // serialized as plain JS objects rather than ES6 Map instances.
+        // Wallets like MetaMask and Rabby expect a plain object structure.
+        use serde::Serialize as _;
+        let serializer = serde_wasm_bindgen::Serializer::json_compatible();
+        let typed_data_value = typed_data.serialize(&serializer).map_err(|e| {
             alloy_signer::Error::other(format!("Failed to serialize typed data: {}", e))
         })?;
 
