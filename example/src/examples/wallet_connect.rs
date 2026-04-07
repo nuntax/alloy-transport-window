@@ -10,15 +10,58 @@ use alloy::providers::{Provider, ProviderBuilder};
 use alloy::rpc::client::RpcClient;
 use alloy::signers::Signer;
 use alloy_transport_window::{WindowSigner, WindowTransport};
+use alloy_dyn_abi::eip712::TypedData;
 use dioxus::prelude::*;
+use serde::Serialize;
+
+alloy_sol_types::sol! {
+    #[derive(Serialize)]
+    struct BingusBongus {
+        address who;
+    }
+}
 
 #[component]
 pub fn WalletConnect() -> Element {
+    let mut window_signer = use_signal(|| Option::<WindowSigner>::None);
     let mut wallet_address = use_signal(|| Option::<Address>::None);
     let mut chain_id = use_signal(|| Option::<u64>::None);
     let mut balance = use_signal(|| Option::<U256>::None);
     let mut error_msg = use_signal(|| Option::<String>::None);
     let mut status_msg = use_signal(|| String::from("Not connected"));
+
+    // Sign message
+    let sign_message = move |_| {
+        spawn(async move {
+            status_msg.set("Attempting to sign messages...".to_string());
+            error_msg.set(None);
+
+            if let Some(signer) = window_signer() {
+                if let Err(e) = signer.sign_message(b"bingus bongus").await {
+                    error_msg.set(Some(format!("Sign message error: {e}")));
+                } else {
+                    status_msg.set("Signed bingus bongus".to_string());
+                }
+
+                let domain = alloy::sol_types::eip712_domain! {
+                    name: "bingus bongus",
+                    version: "0.1.0",
+                };
+                let data = BingusBongus {
+                    who: [0xff; 20].into(),
+                };
+                let typed_data = TypedData::from_struct(&data, Some(domain));
+
+                status_msg.set(format!("Attempting to sign: {typed_data:?}"));
+
+                if let Err(e) = signer.sign_dynamic_typed_data(&typed_data).await {
+                    error_msg.set(Some(format!("Sign EIP-712 error: {e}")));
+                } else {
+                    status_msg.set("Signed EIP-712 data".to_string());
+                }
+            }
+        });
+    };
 
     // Connect to wallet
     let connect_wallet = move |_| {
@@ -30,6 +73,7 @@ pub fn WalletConnect() -> Element {
                 Ok(signer) => {
                     let addr = signer.address();
                     wallet_address.set(Some(addr));
+                    window_signer.set(Some(signer));
                     status_msg.set("Connected!".to_string());
 
                     // Create provider and fetch basic data
@@ -136,6 +180,14 @@ pub fn WalletConnect() -> Element {
                             p { class: "text-lg font-bold text-green-400 font-mono break-all",
                                 "{bal} wei"
                             }
+                        }
+                    }
+
+                    div { class: "flex-1 flex items-center justify-center",
+                        button {
+                            class: "px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg hover:from-blue-500 hover:to-blue-400 transition-all duration-200 font-semibold shadow-lg shadow-blue-500/50",
+                            onclick: sign_message,
+                            "Sign Message"
                         }
                     }
                 }
