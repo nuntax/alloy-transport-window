@@ -1,10 +1,17 @@
 //! WindowSigner implementation - delegates signing to browser wallet
 
 use alloy_primitives::{Address, Signature, B256};
-use alloy_signer::{Result as SignerResult, Signer};
+use alloy_signer::{Result as SignerResult, Signer, UnsupportedSignerOperation};
 use serde_json::json;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
+
+#[cfg(feature = "eip712")]
+use alloy_dyn_abi::eip712::TypedData;
+#[cfg(feature = "eip712")]
+use alloy_dyn_abi::Eip712Domain;
+#[cfg(feature = "eip712")]
+use alloy_sol_types::SolStruct;
 
 use crate::error::{Result, WindowError};
 
@@ -107,19 +114,47 @@ impl WindowSigner {
             chain_id,
         })
     }
-}
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl Signer for WindowSigner {
-    async fn sign_hash(&self, hash: &B256) -> SignerResult<Signature> {
-        let params = serde_wasm_bindgen::to_value(&json!([
-            self.address.to_string(),
-            format!("0x{}", hex::encode(hash))
-        ]))
-        .map_err(|e| alloy_signer::Error::other(e.to_string()))?;
+    /// Sign statically-typed EIP-712 data by converting it to [`TypedData`] and
+    /// delegating to `eth_signTypedData_v4`.
+    ///
+    /// This is the preferred way to sign `sol!`-generated structs. It requires
+    /// `T: serde::Serialize` (in addition to [`SolStruct`]) so that the message
+    /// can be serialised to the JSON object expected by the wallet.
+    ///
+    /// # Note
+    /// The [`Signer::sign_typed_data`] trait method cannot be overridden with
+    /// this implementation because Rust's trait coherence rules (E0276) forbid
+    /// adding the extra `T: Serialize` bound in an `impl` block. Call this
+    /// method directly instead.
+    #[cfg(feature = "eip712")]
+    pub async fn sign_eip712<T: SolStruct + serde::Serialize>(
+        &self,
+        payload: &T,
+        domain: Eip712Domain,
+    ) -> SignerResult<Signature> {
+        let typed_data = TypedData::from_struct(payload, Some(domain));
+        self.sign_dynamic_typed_data_impl(&typed_data).await
+    }
 
-        let promise = ethereum_request(&self.ethereum, "eth_sign", &params);
+    /// Helper method to sign EIP-712 typed data
+    #[cfg(feature = "eip712")]
+    async fn sign_dynamic_typed_data_impl(
+        &self,
+        typed_data: &TypedData,
+    ) -> SignerResult<Signature> {
+        let typed_data_value = serde_wasm_bindgen::to_value(typed_data).map_err(|e| {
+            alloy_signer::Error::other(format!("Failed to serialize typed data: {}", e))
+        })?;
+
+        // Create params array: [address, typedData]
+        let params_array = js_sys::Array::new();
+        params_array.push(&JsValue::from_str(&self.address.to_string()));
+        params_array.push(&typed_data_value);
+
+        let params: JsValue = params_array.into();
+
+        let promise = ethereum_request(&self.ethereum, "eth_signTypedData_v4", &params);
         let result = JsFuture::from(promise)
             .await
             .map_err(|e| alloy_signer::Error::other(WindowError::from(e).to_string()))?;
@@ -130,6 +165,16 @@ impl Signer for WindowSigner {
         sig_hex
             .parse()
             .map_err(|e| alloy_signer::Error::other(format!("Invalid signature: {}", e)))
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+impl Signer for WindowSigner {
+    async fn sign_hash(&self, _hash: &B256) -> SignerResult<Signature> {
+        Err(alloy_signer::Error::UnsupportedOperation(
+            UnsupportedSignerOperation::SignHash,
+        ))
     }
 
     async fn sign_message(&self, message: &[u8]) -> SignerResult<Signature> {
@@ -150,6 +195,26 @@ impl Signer for WindowSigner {
         sig_hex
             .parse()
             .map_err(|e| alloy_signer::Error::other(format!("Invalid signature: {}", e)))
+    }
+
+    #[cfg(feature = "eip712")]
+    async fn sign_typed_data<T: SolStruct + Send + Sync>(
+        &self,
+        _payload: &T,
+        _domain: &Eip712Domain,
+    ) -> SignerResult<Signature> {
+        // `eth_signTypedData_v4` requires the message as a JSON object, which
+        // requires `T: serde::Serialize`. Rust's trait coherence rules forbid
+        // adding that bound here (E0276). Use `sign_eip712` instead, which
+        // accepts `T: SolStruct + Serialize` as an inherent method.
+        Err(alloy_signer::Error::UnsupportedOperation(
+            UnsupportedSignerOperation::SignTypedData,
+        ))
+    }
+
+    #[cfg(feature = "eip712")]
+    async fn sign_dynamic_typed_data(&self, payload: &TypedData) -> SignerResult<Signature> {
+        self.sign_dynamic_typed_data_impl(payload).await
     }
 
     fn address(&self) -> Address {

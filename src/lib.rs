@@ -8,9 +8,10 @@
 //! ## Features
 //!
 //! - **WindowTransport**: Implements Alloy's `Transport` trait to route RPC calls through `window.ethereum`
-//! - **WindowSigner**: Implements Alloy's `Signer` trait for message signing (note: NOT for transaction signing)
+//! - **WindowSigner**: Implements Alloy's `Signer` trait for message signing via `personal_sign` and EIP-712 typed data signing
 //! - **WASM Compatible**: Designed specifically for use in browser environments
 //! - **Transaction Support**: Send transactions via `eth_sendTransaction` - browser wallet handles signing
+//! - **EIP-712 Support** (with `eip712` feature): Sign structured data using `eth_signTypedData_v4`
 //! - **Minimal Code**: ~200 lines of well-documented code
 //!
 //! ## Example - Read-only Provider
@@ -62,7 +63,9 @@
 //!
 //! Browser wallets use `eth_sendTransaction` which signs AND broadcasts transactions in a single call.
 //! They don't support `eth_sign` for security reasons. Therefore:
-//! - `WindowSigner` implements `Signer` for message signing (personal_sign)
+//! - `WindowSigner` implements message signing via `personal_sign` for EIP-191 signed messages
+//! - `WindowSigner` implements EIP-712 typed data signing via `eth_signTypedData_v4` (with `eip712` feature)
+//! - `WindowSigner` does NOT support `eth_sign` (deprecated and unsupported by wallets)
 //! - `WindowSigner` does NOT implement `TxSigner` or `NetworkWallet`
 //! - To send transactions, use `provider.send_transaction()` directly (no wallet attachment needed)
 //! - The `WindowTransport` automatically routes transaction requests through the browser wallet
